@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>直播源文件上传工具（GitHub版）</title>
+<style>
+/* 保持原有样式不变 */
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 "Microsoft YaHei";background:#f9fafb;color:#374151;display:flex;flex-direction:column;min-height:100vh}
+.top-nav,.footer-links{background:#4285f4;text-align:center;padding:10px 0;font-size:0}
+.top-nav a,.footer-links a{color:#fff;font-size:13px;margin:0 8px;padding:4px 6px;text-decoration:none}
+.top-nav a:hover,.footer-links a:hover{text-decoration:underline}
+.container{width:100%;max-width:800px;margin:0 auto 24px;padding:16px;background:#fff;border-radius:0 0 8px 8px;box-shadow:0 0 6px rgba(0,0,0,.04);flex:1}
+h2{font-size:18px;text-align:center;margin:0 0 16px}
+label{font-size:14px;margin-bottom:6px;display:block}
+input[type=text],textarea{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:15px;resize:none}
+textarea{min-height:140px}
+button{border:none;border-radius:6px;padding:12px 0;font-size:15px;font-weight:600;color:#fff;cursor:pointer;transition:filter .2s;margin-right:8px}
+button:hover{filter:brightness(1.1)}
+.enc{background:#f093fb}.copy{background:#f7b801}.clear{background:#ef476f}.down{background:#4895ef}
+.desc{color:#64748b;text-align:center;margin-bottom:20px;font-size:14px}
+.section{margin-bottom:20px;padding:20px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0}
+.file-info{font-size:12px;color:#64748b;margin-top:8px}
+.action-buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.link-box{display:flex;gap:10px;margin-top:10px}
+.link-box input{flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px}
+.msg{padding:12px;border-radius:6px;margin-top:15px;font-weight:500;display:none}
+.msg.success{background:rgba(6,214,160,.2);color:#057a5c;border-left:4px solid #06d6a0}
+.msg.error{background:rgba(239,71,111,.2);color:#b71540;border-left:4px solid #ef476f}
+
+/* 配置区域 */
+.config-section{background:#fff3cd;border:1px solid #ffeaa7;border-radius:6px;padding:15px;margin-bottom:20px}
+.config-section h3{margin-top:0;color:#856404}
+.config-section input{width:100%;margin:8px 0;padding:8px}
+</style>
+</head>
+<body>
+
+<div class="top-nav">
+    <a href="index.html">我的主页</a>
+    <a href="1.html">格式转换</a>
+    <a href="2.html">加密工具</a>
+    <a href="pl.html">批量工具</a>
+</div>
+
+<div class="container">
+    <h2>直播源文件上传与编辑工具（GitHub API版）</h2>
+    
+    <!-- 配置区域 -->
+    <div class="config-section">
+        <h3>🔧 GitHub配置</h3>
+        <label>仓库地址（如：username/repo）</label>
+        <input type="text" id="repoName" placeholder="gyjune/live-source">
+        <label>GitHub Token（需要repo权限）</label>
+        <input type="password" id="githubToken" placeholder="ghp_xxxxxxxx">
+        <button class="down" onclick="saveConfig()">保存配置</button>
+        <p class="file-info">配置保存在浏览器本地，不会上传到服务器</p>
+    </div>
+
+    <p class="desc">支持上传TXT/M3U文件后编辑内容，或直接输入内容生成文件。内容将保存到GitHub仓库的/1/gyj.txt文件中。</p>
+
+    <!-- 文件上传 -->
+    <div class="section">
+        <label>📁 选择文件</label>
+        <input type="file" id="fileUpload" accept=".txt,.m3u">
+        <p class="file-info">支持.txt和.m3u格式文件，最大不超过5MB</p>
+        <div class="btn-grid">
+            <button class="enc" onclick="loadFile()">加载文件</button>
+        </div>
+    </div>
+
+    <!-- 编辑区 -->
+    <div class="section">
+        <label>✏️ 编辑文件</label>
+        <textarea id="content" placeholder="请输入或粘贴直播源内容..."></textarea>
+        <div class="action-buttons">
+            <button class="down" onclick="saveFile()">保存到GitHub仓库</button>
+            <button class="clear" onclick="clearContent()">清空内容</button>
+        </div>
+    </div>
+
+    <!-- 链接展示 -->
+    <div class="section" id="linkArea" style="display:none">
+        <label>🔗 文件链接</label>
+        <div class="link-box">
+            <input type="text" id="fileLink" readonly>
+            <button class="copy" onclick="copyLink()">复制链接</button>
+        </div>
+    </div>
+
+    <!-- 提示 -->
+    <div id="msg" class="msg"></div>
+</div>
+
+<div class="footer-links">
+    <a onclick="window.open('https://link3.cc/gyjune')">我的工具箱</a>
+    <a onclick="alert('邮箱：gyjune@126.com')">我的邮箱</a>
+    <a onclick="window.open('https://weibo.com/u/1771411553')">我的微博</a>
+    <a href="1.html">格式转换</a>
+    <a href="zby.html">直播源生成工具</a>
+    <a href="sc.html">直播源上传工具</a>
+</div>
+<div class="copyright">Copyright © 2025 多功能网站 | 版权所有</div>
+
+<script>
+// 配置存储
+const CONFIG_KEY = 'github_config';
+const FILE_PATH = '1/gyj.txt'; // 固定路径
+
+// 获取配置
+function getConfig() {
+    const config = localStorage.getItem(CONFIG_KEY);
+    return config ? JSON.parse(config) : { repoName: '', token: '' };
+}
+
+// 保存配置
+function saveConfig() {
+    const repoName = document.getElementById('repoName').value.trim();
+    const token = document.getElementById('githubToken').value.trim();
+    
+    if (!repoName || !token) {
+        showMsg('请填写完整的配置信息', 'error');
+        return;
+    }
+    
+    localStorage.setItem(CONFIG_KEY, JSON.stringify({ repoName, token }));
+    showMsg('配置已保存', 'success');
+}
+
+// 加载配置到表单
+function loadConfig() {
+    const config = getConfig();
+    document.getElementById('repoName').value = config.repoName || '';
+    document.getElementById('githubToken').value = config.token || '';
+}
+
+// GitHub API 调用
+async function githubAPI(endpoint, method = 'GET', body = null) {
+    const config = getConfig();
+    if (!config.repoName || !config.token) {
+        throw new Error('请先配置GitHub信息');
+    }
+    
+    const url = `https://api.github.com/repos/${config.repoName}${endpoint}`;
+    const options = {
+        method,
+        headers: {
+            'Authorization': `token ${config.token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
+        }
+    };
+    
+    if (body) {
+        options.body = JSON.stringify(body);
+    }
+    
+    const response = await fetch(url, options);
+    if (!response.ok) {
+        throw new Error(`GitHub API错误: ${response.status}`);
+    }
+    
+    return response.json();
+}
+
+// 读取文件内容
+async function readFile() {
+    try {
+        const data = await githubAPI(`/contents/${FILE_PATH}`);
+        // Base64解码
+        const content = atob(data.content.replace(/\s/g, ''));
+        return content;
+    } catch (error) {
+        // 文件不存在时返回空内容
+        if (error.message.includes('404')) {
+            return '# 暂无内容，请编辑后保存';
+        }
+        throw error;
+    }
+}
+
+// 写入文件内容
+async function writeFile(content, message = '更新直播源文件') {
+    // 先获取文件SHA（如果存在）
+    let sha = null;
+    try {
+        const existing = await githubAPI(`/contents/${FILE_PATH}`);
+        sha = existing.sha;
+    } catch (error) {
+        // 文件不存在，sha保持null
+    }
+    
+    const data = {
+        message: message,
+        content: btoa(unescape(encodeURIComponent(content))), // Base64编码
+        path: FILE_PATH
+    };
+    
+    if (sha) {
+        data.sha = sha;
+    }
+    
+    return await githubAPI(`/contents/${FILE_PATH}`, 'PUT', data);
+}
+
+// 文件操作函数
+async function loadFile() {
+    const f = document.getElementById('fileUpload').files[0];
+    if (!f) { showMsg('请先选择文件', 'error'); return; }
+    if (f.size > 5 * 1024 * 1024) { showMsg('文件大小不能超过5MB', 'error'); return; }
+    
+    const r = new FileReader();
+    r.onload = e => {
+        document.getElementById('content').value = e.target.result;
+        showMsg('文件内容已加载', 'success');
+    };
+    r.readAsText(f);
+}
+
+async function saveFile() {
+    const c = document.getElementById('content').value.trim();
+    if (!c) { showMsg('内容不能为空', 'error'); return; }
+    
+    showMsg('正在保存到GitHub...', 'success');
+    
+    try {
+        await writeFile(c, '更新直播源文件');
+        
+        // 生成文件链接
+        const config = getConfig();
+        const fileUrl = `https://raw.githubusercontent.com/${config.repoName}/main/${FILE_PATH}`;
+        document.getElementById('fileLink').value = fileUrl;
+        document.getElementById('linkArea').style.display = 'block';
+        
+        showMsg('✅ 文件已保存到GitHub仓库', 'success');
+    } catch (error) {
+        showMsg('保存失败: ' + error.message, 'error');
+    }
+}
+
+function clearContent() {
+    document.getElementById('content').value = '';
+    showMsg('编辑框已清空', 'success');
+}
+
+function copyLink() {
+    const i = document.getElementById('fileLink');
+    i.select();
+    document.execCommand('copy');
+    showMsg('✅ 链接已复制', 'success');
+}
+
+function showMsg(text, type) {
+    const m = document.getElementById('msg');
+    m.textContent = text;
+    m.className = 'msg ' + type;
+    m.style.display = 'block';
+    setTimeout(() => m.style.display = 'none', 3000);
+}
+
+// 页面加载时
+window.onload = async () => {
+    loadConfig();
+    
+    // 尝试读取已有内容
+    try {
+        const content = await readFile();
+        document.getElementById('content').value = content;
+    } catch (error) {
+        console.log('读取文件失败:', error);
+    }
+};
+</script>
+</body>
+</html>
