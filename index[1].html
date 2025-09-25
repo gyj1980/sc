@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>直播源编辑器</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 "Microsoft YaHei";background:#f9fafb;color:#374151;display:flex;flex-direction:column;min-height:100vh}
+.top-nav{background:#4285f4;text-align:center;padding:10px 0}
+.top-nav a{color:#fff;font-size:13px;margin:0 8px;padding:4px 6px;text-decoration:none}
+.container{width:100%;max-width:800px;margin:0 auto 24px;padding:16px;background:#fff;border-radius:8px;box-shadow:0 0 6px rgba(0,0,0,.04);flex:1}
+h2{font-size:18px;text-align:center;margin:0 0 16px}
+textarea{width:100%;height:400px;padding:10px;border:1px solid #d1d5db;border-radius:6px;resize:vertical}
+button{border:none;border-radius:6px;padding:10px 20px;color:#fff;font-weight:600;cursor:pointer}
+button:hover{filter:brightness(1.1)}
+#saveBtn{background:#06d6a0}#copyBtn{background:#f7b801}#msg{margin-top:10px;font-weight:500}
+</style>
+</head>
+<body>
+<div class="top-nav">
+  <a href="index.html">我的主页</a>
+  <a href="1.html">格式转换</a>
+  <a href="2.html">加密工具</a>
+  <a href="pl.html">批量工具</a>
+</div>
+
+<div class="container">
+  <h2>直播源文件上传与编辑工具</h2>
+  <label>✏️ 编辑内容</label>
+  <textarea id="content" placeholder="请输入或粘贴直播源内容..."></textarea>
+  <br>
+  <button id="saveBtn" onclick="saveFile()">保存并覆盖</button>
+  <button id="copyBtn" onclick="copyLink()">复制文件链接</button>
+  <div id="msg"></div>
+</div>
+
+<script>
+const owner = '你的用户名';      // ✅ 改成你的
+const repo  = '你的仓库';        // ✅ 改成你的
+const path  = 'gyj.txt';
+const token = '[[TOKEN]]';       // ✅ 占位，后面动态替换成真实 PAT
+
+let fileSha = null;
+
+/* 页面加载时读取已有内容 */
+async function loadFile() {
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`);
+  if (!res.ok) return;
+  const data = await res.json();
+  fileSha = data.sha;
+  const txt = decodeURIComponent(escape(atob(data.content)));
+  document.getElementById('content').value = txt;
+}
+loadFile();
+
+/* 保存（commit）文件 */
+async function saveFile() {
+  const content = document.getElementById('content').value;
+  const body = {
+    message: 'Update gyj.txt',
+    content: btoa(unescape(encodeURIComponent(content))),
+    sha: fileSha
+  };
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `token ${getToken()}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (res.ok) {
+    fileSha = (await res.json()).content.sha;
+    showMsg('✅ 已保存并推送到 GitHub！', 'success');
+  } else {
+    showMsg('保存失败，请检查 PAT 与仓库名', 'error');
+  }
+}
+
+/* 复制文件直链 */
+function copyLink() {
+  const url = `https://${owner}.github.io/${repo}/${path}`;
+  navigator.clipboard.writeText(url);
+  showMsg('✅ 文件链接已复制', 'success');
+}
+
+/* 读取仓库 Secret：TOKEN */
+function getToken() {
+  // 把 [[TOKEN]] 替换成真实 PAT（最简单做法，先跑通）
+  return '[[TOKEN]]'.startsWith('[[') ? prompt('请一次性粘贴你的 PAT（ghp_...）：') : '[[TOKEN]]';
+}
+
+/* 提示信息 */
+function showMsg(txt, type) {
+  const m = document.getElementById('msg');
+  m.textContent = txt;
+  m.style.color = type === 'success' ? 'green' : 'red';
+  setTimeout(() => m.textContent = '', 3000);
+}
+</script>
+</body>
+</html>
