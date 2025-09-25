@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>直播源文件上传工具</title>
+<style>
+/* 完全复刻原样式 */
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 "Microsoft YaHei";background:#f9fafb;color:#374151;display:flex;flex-direction:column;min-height:100vh}
+.top-nav,.footer-links{background:#4285f4;text-align:center;padding:10px 0;font-size:0}
+.top-nav a,.footer-links a{color:#fff;font-size:13px;margin:0 8px;padding:4px 6px;text-decoration:none}
+.top-nav a:hover,.footer-links a:hover{text-decoration:underline}
+.container{width:100%;max-width:800px;margin:0 auto 24px;padding:16px;background:#fff;border-radius:0 0 8px 8px;box-shadow:0 0 6px rgba(0,0,0,.04);flex:1}
+h2{font-size:18px;text-align:center;margin:0 0 16px}
+label{font-size:14px;margin-bottom:6px;display:block}
+input[type=text],textarea{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:15px;resize:none}
+textarea{min-height:140px}
+button{border:none;border-radius:6px;padding:12px 0;font-size:15px;font-weight:600;color:#fff;cursor:pointer;transition:filter .2s;margin-right:8px}
+button:hover{filter:brightness(1.1)}
+.enc{background:#f093fb}.copy{background:#f7b801}.clear{background:#ef476f}.down{background:#4895ef}
+.desc{color:#64748b;text-align:center;margin-bottom:20px;font-size:14px}
+.section{margin-bottom:20px;padding:20px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0}
+.file-info{font-size:12px;color:#64748b;margin-top:8px}
+.action-buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.link-box{display:flex;gap:10px;margin-top:10px}
+.link-box input{flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px}
+.msg{padding:12px;border-radius:6px;margin-top:15px;font-weight:500;display:none}
+.msg.success{background:rgba(6,214,160,.2);color:#057a5c;border-left:4px solid #06d6a0}
+.msg.error{background:rgba(239,71,111,.2);color:#b71540;border-left:4px solid #ef476f}
+</style>
+</head>
+<body>
+
+<div class="top-nav">
+    <a href="index.html">我的主页</a>
+    <a href="1.html">格式转换</a>
+    <a href="2.html">加密工具</a>
+    <a href="pl.html">批量工具</a>
+</div>
+
+<div class="container">
+    <h2>直播源文件上传与编辑工具</h2>
+    <p class="desc">支持上传TXT/M3U文件后编辑内容，或直接输入内容生成文件。每次提交将覆盖同一文件。</p>
+
+    <!-- 文件上传 -->
+    <div class="section">
+        <label>📁 选择文件</label>
+        <input type="file" id="fileUpload" accept=".txt,.m3u">
+        <p class="file-info">支持.txt和.m3u格式文件，最大不超过5MB</p>
+        <div class="btn-grid">
+            <button class="enc" onclick="loadFile()">加载文件</button>
+        </div>
+    </div>
+
+    <!-- 编辑区 -->
+    <div class="section">
+        <label>✏️ 编辑文件</label>
+        <textarea id="content" placeholder="请输入或粘贴直播源内容..."></textarea>
+        <div class="action-buttons">
+            <button class="down" onclick="saveFile()">保存并覆盖</button>
+            <button class="clear" onclick="clearContent()">清空内容</button>
+        </div>
+    </div>
+
+    <!-- 链接展示 -->
+    <div class="section" id="linkArea" style="display:none">
+        <label>🔗 文件链接</label>
+        <div class="link-box">
+            <input type="text" id="fileLink" readonly>
+            <button class="copy" onclick="copyLink()">复制链接</button>
+        </div>
+    </div>
+
+    <!-- 提示 -->
+    <div id="msg" class="msg"></div>
+</div>
+
+<div class="footer-links">
+    <a onclick="window.open('https://link3.cc/gyjune')">我的工具箱</a>
+    <a onclick="alert('邮箱：gyjune@126.com')">我的邮箱</a>
+    <a onclick="window.open('https://weibo.com/u/1771411553')">我的微博</a>
+    <a href="1.html">格式转换</a>
+    <a href="zby.html">直播源生成工具</a>
+    <a href="/">直播源上传工具</a>
+</div>
+<div class="copyright">Copyright © 2025 多功能网站 | 版权所有</div>
+
+<script>
+let fixedUrl = ""; // 通过 /save 返回
+
+function loadFile(){
+    const f=document.getElementById('fileUpload').files[0];
+    if(!f){showMsg('请先选择文件','error');return}
+    if(f.size>5*1024*1024){showMsg('文件大小不能超过5MB','error');return}
+    const r=new FileReader();
+    r.onload=e=>{
+        document.getElementById('content').value=e.target.result;
+        showMsg('文件内容已加载','success');
+    };
+    r.readAsText(f);
+}
+
+async function saveFile(){
+    const c=document.getElementById('content').value.trim();
+    if(!c){showMsg('内容不能为空','error');return}
+    showMsg('正在保存...','success');
+    const res=await fetch('/save',{method:'POST',body:c});
+    const data=await res.json();
+    fixedUrl=data.url;
+    document.getElementById('fileLink').value=fixedUrl;
+    document.getElementById('linkArea').style.display='block';
+    showMsg('✅ 文件已保存（覆盖gyj.txt）','success');
+}
+
+function clearContent(){
+    document.getElementById('content').value='';
+    showMsg('编辑框已清空','success');
+}
+
+function copyLink(){
+    const i=document.getElementById('fileLink');
+    i.select();
+    document.execCommand('copy');
+    showMsg('✅ 链接已复制','success');
+}
+
+function showMsg(text,type){
+    const m=document.getElementById('msg');
+    m.textContent=text;
+    m.className='msg '+type;
+    setTimeout(()=>m.className='msg',3000);
+}
+
+// 页面加载时自动读取已有内容
+fetch('/read').then(r=>r.text()).then(t=>document.getElementById('content').value=t);
+</script>
+</body>
+</html>
